@@ -14,6 +14,8 @@ use std::{
 };
 
 use anyhow::Context;
+#[cfg(target_os = "windows")]
+use innerput::{Innerput, Key, Keyboard};
 use notify::{DebouncedEvent, Watcher};
 use rbx_dom_weak::types::VariantType;
 use rbx_dom_weak::WeakDom;
@@ -205,7 +207,7 @@ struct StudioOutput {
 /// Studio, coax Studio to re-save it, and reads back the resulting place.
 fn roundtrip_place_through_studio(place_contents: &str) -> anyhow::Result<StudioOutput> {
     let output_dir = tempdir()?;
-    let output_path = output_dir.path().join("roundtrip.rbxlx");
+    let output_path = output_dir.path().join("GenerateReflectionRoundtrip.rbxlx");
     log::info!("Generating place at {}", output_path.display());
     fs::write(&output_path, place_contents)?;
 
@@ -225,10 +227,26 @@ fn roundtrip_place_through_studio(place_contents: &str) -> anyhow::Result<Studio
     watcher.watch(&output_path, notify::RecursiveMode::NonRecursive)?;
 
     log::info!("Waiting for Roblox Studio to re-save place...");
-    println!("Please save the opened place in Roblox Studio (ctrl+s).");
 
-    // TODO: User currently has to manually save the place. We could use a crate
-    // like enigo or maybe raw input calls to do this for them.
+    #[cfg(target_os = "windows")]
+    {
+        let did_send_chord =
+            Innerput::new().send_chord(&[Key::Control, Key::Char('s')], &studio_process);
+
+        match did_send_chord {
+            Ok(()) => (),
+            Err(err) => {
+                log::error!("{}", err);
+
+                println!(
+                "Failed to send key chord to Roblox Studio. Please save the opened place manually."
+                )
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    println!("Please save the opened place in Roblox Studio (ctrl+s).");
 
     loop {
         if let DebouncedEvent::Write(_) = rx.recv()? {
