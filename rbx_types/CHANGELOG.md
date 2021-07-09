@@ -1,6 +1,7 @@
 # rbx_types Changelog
 
 ## Unreleased Changes
+* Added an `Attributes` struct to facilitate reading and writing of attribute values.
 
 ## 1.1.0 (2021-07-02)
 * Critical fix: changed serde serialization of fields from PascalCase to camelCase. ([#191][#191])
