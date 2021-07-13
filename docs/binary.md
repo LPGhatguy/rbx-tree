@@ -514,13 +514,15 @@ The `ColorSequence` type is stored as a `u32` indicating how many `ColorSequence
 
 `ColorSequenceKeypoint` is a struct composed of the following fields:
 
-| Field Name        | Format              | Value                                          |
-|:------------------|:--------------------|:-----------------------------------------------|
-| Time              | `f32`               | The time value of the `ColorSequenceKeypoint`  |
-| Color             | [`Color3`](#Color3) | The color value of the `ColorSequenceKeypoint` |
-| Envelope (unused) | `f32`               | n/a; serialized, but not used                  |
+| Field Name        | Format | Value                                              |
+|:------------------|:-------|:---------------------------------------------------|
+| Time              | `f32`  | The time value of the `ColorSequenceKeypoint`      |
+| R                 | `f32`  | The red component of the keypoint's color value.   |
+| G                 | `f32`  | The green component of the keypoint's color value. |
+| B                 | `f32`  | The blue component of the keypoint's color value.  |
+| Envelope (unused) | `f32`  | n/a; serialized, but not used                      |
 
-Note that `Color` is **not** subject to interleaving like a normal `Color3`. When multiple `ColorSequence` values are present, they are stored in sequence with no transformation or interleaving. Two `ColorSequence` values
+When multiple `ColorSequence` values are present, they are stored in sequence with no transformation or interleaving. Two `ColorSequence` values
 
 ```lua
 ColorSequence.new(
