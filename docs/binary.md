@@ -19,6 +19,7 @@ This document is based on:
 	- [`SSTR` Chunk](#sstr-chunk)
 	- [`INST` Chunk](#inst-chunk)
 	- [`PROP` Chunk](#prop-chunk)
+		- [Values](#values)
 	- [`PRNT` Chunk](#prnt-chunk)
 	- [`END` Chunk](#end-chunk)
 - [Data Types](#data-types)
@@ -48,7 +49,7 @@ This document is based on:
 	- [Color3uint8](#color3uint8)
 	- [Int64](#int64)
 	- [SharedString](#sharedstring)
-	- [OptionalCoordinateFrame](#optionalcoordinateframe)
+	- [Optional](#optional)
 - [Data Storage Notes](#data-storage-notes)
 	- [Integer Transformations](#integer-transformations)
 	- [Byte Interleaving](#byte-interleaving)
@@ -181,10 +182,11 @@ The length of **Referents** must equal **Instance Count**.
 ### `PROP` Chunk
 The `PROP` chunk has this layout:
 
-| Field Name    | Format              | Value                                                    |
-|:--------------|:--------------------|:---------------------------------------------------------|
-| Class ID      | `u32`               | The class ID assigned in the `INST` chunk                |
-| Property Name | [`String`](#string) | The name of the property, like `CFrame`                  |
+| Field Name    | Format              | Value                                         |
+|:--------------|:--------------------|:----------------------------------------------|
+| Class ID      | `u32`               | The class ID assigned in the `INST` chunk     |
+| Property Name | [`String`](#string) | The name of the property, like `CFrame`       |
+| Values        | [`Values`](#values) | The type of the property and a list of values | 
 | Type ID       | `u8`                | The [Data Type](#data-types) of the property             |
 | Values        | Array(Value)        | A list of values whose type is determined by **Type ID** |
 
@@ -198,9 +200,15 @@ Because of the shape of this chunk, every instance of a given class must have th
 
 **Property Name** defines the serializable name of the property. Note that this is not necessarily the same as the name reflected to Lua, which is sometimes referred to as the _canonical name_.
 
-**Type ID** corresponds to a [Data Type's](#data-types) **Type ID**.
+**Values** is composed of a struct of the following shape:
 
-**Values** contains an array of values whose type is determined by **Type ID** and whose length is equal to the number of instances belonging to **Class ID**.
+#### Values
+| Field Name | Format       | Value                                                    |
+|:-----------|:-------------|:---------------------------------------------------------|
+| Type ID    | `u8`         | The [Data Type](#data-types)                             |
+| Values     | Array(Value) | A list of values whose type is determined by **Type ID** |
+
+This struct is later used by the [`Optional`](#optional) type, so it's suggested that implementors decouple their **Values** (de)serializers from their chunk (de)serializers.
 
 ### `PRNT` Chunk
 The `PRNT` chunk has this layout:
@@ -610,14 +618,27 @@ When an array of `Int64` values is present, the bytes of the integers are subjec
 
 `SharedString` values are stored as an [Interleaved Array](#byte-interleaving) of `u32` values that represent indices in the [`SSTR`](#sstr-chunk) string array.
 
-### OptionalCoordinateFrame
+### Optional
 **Type ID `0x1e`**
 
-`OptionalCoordinateFrame` is stored the same way as [`CFrame`](#cframe), but with a couple interesting differences:
-* Immediately following the type ID for `OptionalCoordinateFrame` is the type ID for `CFrame` (`10`);
-* At the end of the chunk there is an array of `Bool` values (preceded by the respective type ID, `02`) that indicates which `OptionalCoordinateFrame` values have a value.
+The `Optional` type is stored as a struct of two [`Values`](#values) in the following shape:
 
-An `OptionalCoordinateFrame` with value `CFrame.new(0, 0, 1, 0, -1, 0, 1, 0, 0, 0, 0, 1)` followed by an `OptionalCoordinateFrame` with no value looks like this: `10 0a 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 7f 00 00 00 00 00 00 00 02 01 00`. Note that the valueless `OptionalCoordinateFrame` is written as the identity `CFrame` with its corresponding boolean `00` codifying its valuelessness.
+| Field Name | Type                | Value                                                   |
+|:-----------|:--------------------|:--------------------------------------------------------|
+| Data       | [`Values`](#values) | The actual values of the property                       |
+| Presence   | [`Values`](#values) | An indicator for what Instances have 'filled in' values |
+
+This type is used for properties that are considered optional by Roblox (such as `Model.WorldPivotData`).
+
+The `Data` field is a list of all values for the property. The `Presence` field is a list of booleans that indicates whether a particular Instance has an actual value for the property or not. Both fields will be the same length as one would expect when decoding a property.
+
+In the event that a value in `Data` isn't filled, the default of the particular type will be substituted in so as to not leave any holes. As an example, if a `CFrame` weren't filled, the identity CFrame would be written.
+
+The values in `Presence` indicate which values are filler and which ones are 'real'. If, as an example, the second entry in `Presence` was `00` then the second entry in `Data` would be the default value for the type and when applying properties to Instances, the second one would be skipped.
+
+An `Optional` CFrame with value `CFrame.new(0, 0, 1, 0, -1, 0, 1, 0, 0, 0, 0, 1)` followed by no value looks like this: `10 0a 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 7f 00 00 00 00 00 00 00 02 01 00`.
+
+Note that the valueless `Optional` is written as the identity CFrame with its corresponding boolean `00` codifying its valuelessness.
 
 ## Data Storage Notes
 
